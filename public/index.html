@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aravals Global IPTV</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <link rel="icon" type="image/x-icon" href="https://cdn-icons-png.flaticon.com/512/716/716429.png">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+    <div id="auth-modal" class="auth-overlay">
+        <div class="auth-box">
+            <h2 id="auth-title">Account Login</h2>
+            <p id="auth-error" style="color: #ef4444; font-size: 13px; margin: 5px 0; display: none;"></p>
+            
+            <form onsubmit="event.preventDefault(); handleAuthSubmit();">
+                <input type="text" id="auth-username" placeholder="Username" required autocomplete="username">
+                <input type="password" id="auth-password" placeholder="Password" required autocomplete="current-password">
+                <button type="submit" id="btn-auth" class="submit-btn" style="width:100%; margin-top:10px;">Login</button>
+            </form>
+            
+            <p style="font-size: 13px; color: #9ca3af; margin-top: 15px; cursor: pointer; text-align: center;" onclick="toggleAuthMode()" id="auth-toggle-text">Don't have an account? Signup here</p>
+        </div>
+    </div>
+
+    <div id="app-content" style="filter: blur(8px); pointer-events: none; transition: 0.3s;">
+        <header>
+    <h1>ARAVALS GLOBAL IPTV</h1>
+    <div style="display: flex; align-items: center; gap: 15px;">
+        <span id="user-display" style="font-weight: bold; color: #38bdf8;">Profile: Guest</span>
+        
+        <div id="change-pass-section" style="display: none; position: relative;">
+            <button onclick="togglePasswordBox()" style="background:#1e293b; border:1px solid #334155; color:#fff; font-size:11px; padding:5px 10px; border-radius:6px; cursor:pointer;">⚙️ Change Password</button>
+            <div id="password-box" style="display: none; position: absolute; top: 30px; right: 0; background: #111827; border: 1px solid #1e293b; padding: 15px; border-radius: 8px; width: 220px; z-index: 500; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+                <input type="password" id="old-pass-input" placeholder="Current Password" style="width:100%; padding:6px; margin-bottom:8px; background:#1f2937; border:1px solid #374151; color:#fff; border-radius:4px; font-size:12px;">
+                <input type="password" id="new-pass-input" placeholder="New Secure Password" style="width:100%; padding:6px; margin-bottom:8px; background:#1f2937; border:1px solid #374151; color:#fff; border-radius:4px; font-size:12px;">
+                <button onclick="submitNewPassword()" style="width:100%; background:#10b981; border:none; color:#fff; padding:6px; border-radius:4px; font-weight:bold; font-size:12px; cursor:pointer;">Update Pass</button>
+                <div id="pass-msg" style="font-size:11px; margin-top:5px; text-align:center; display:none;"></div>
+            </div>
+        </div>
+
+        <button onclick="logout()" style="background:none; border:none; color:#ef4444; font-size:12px; cursor:pointer; font-weight:bold;">[Logout]</button>
+        <div id="sync-status" style="font-size: 12px; color: #6b7280;">Secure Tunnel Locked</div>
+    </div>
+</header>
+
+        <div class="control-panel">
+            <div id="channel-counter" class="counter-badge">Total Live Channels: 0</div>
+            <input type="text" id="search-input" oninput="handleSearch()" placeholder="🔍 Search channel by name or country...">
+        </div>
+
+        <div class="main-container">
+            <div>
+                <div class="player-wrapper">
+                    <video id="video-player" controls autoplay muted></video>
+                </div>
+                <h3 id="playing-title" style="margin-top: 15px;">Broadcast Standby</h3>
+            </div>
+
+            <div>
+                <div id="filter-bar" class="filter-bar">
+                    <button onclick="filterGroup('All')" id="btn-all" class="country-btn active">All</button>
+                </div>
+                <div id="channel-container" class="channel-list">
+                    <div style="text-align: center; color: #6b7280; padding: 20px;">Please login to load streams.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-box">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <label style="font-weight: bold; font-size: 14px;">Select an M3U File or Paste playlist text below:</label>
+                <input type="file" id="file-input" accept=".m3u,.m3u8" style="font-size: 13px; color: #9ca3af; cursor: pointer;">
+            </div>
+            <textarea id="playlist-input" placeholder="#EXTM3U&#10;#EXTINF:-1 tvg-id='Somoy',Somoy TV&#10;https://example.com/live.m3u8"></textarea>
+            <button onclick="submitPlaylist()" id="btn-submit" class="submit-btn">Scan and Inject to Platform</button>
+        </div>
+
+        <div id="admin-panel" class="admin-section" style="display: none;">
+            <div class="admin-header">ARAVALS COMMAND CENTER (ADMIN ONLY)</div>
+            
+            <div class="admin-metrics">
+                <div class="metric-card">
+                    <div class="metric-val" id="adm-total-users">0</div>
+                    <div class="metric-lbl">Total Registered Clients</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-val" id="adm-total-channels">0</div>
+                    <div class="metric-lbl">Total Verified Stored Streams</div>
+                </div>
+                <div class="metric-card" style="border-color: #10b981;">
+                    <div class="metric-val" id="adm-active-streams" style="color: #10b981;">0</div>
+                    <div class="metric-lbl">Live Streaming Watching Right Now</div>
+                </div>
+            </div>
+
+            <div class="admin-grid">
+                <div class="admin-card-box">
+                    <h3>👥 Registered User Database Management</h3>
+                    <div id="admin-user-list" class="admin-scroll-list">
+                        <div style="color: #6b7280; padding:10px;">Loading users list...</div>
+                    </div>
+                </div>
+                
+                <div class="admin-card-box">
+                    <h3>📡 Real-Time Active Streams Tracking</h3>
+                    <div id="admin-live-streams" class="admin-scroll-list">
+                        <div style="color: #6b7280; padding:10px;">Waiting for users activity stream...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <div class="footer-content">
+                <div class="footer-brand">ARAVALS <span>GLOBAL IPTV</span></div>
+                <p>© 2026 Aravals Stream Engine. All Rights Reserved. Powered by Ultra-Sync Automation.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
